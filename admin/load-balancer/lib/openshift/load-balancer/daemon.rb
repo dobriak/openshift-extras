@@ -124,6 +124,8 @@ module OpenShift
       begin
         if event[:meta]
           @lb_controller.override_config event[:meta]
+        else
+          @lb_controller.read_config
         end
         
         case event[:action]
