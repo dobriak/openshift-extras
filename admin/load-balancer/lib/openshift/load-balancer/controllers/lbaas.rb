@@ -159,6 +159,38 @@ module OpenShift
       @virtual_server_name = cfg['VIRTUAL_SERVER']
     end
 
+    def override_config meta
+      @logger.info "LBaaS override_config called."
+      if meta.has_key?('LBAAS_HOST')
+        @lbaas_host = meta['LBAAS_HOST']
+      end 
+      if meta.has_key?('LBAAS_TENANT') 
+        @lbaas_tenant = meta['LBAAS_TENANT']
+      end
+      if meta.has_key?('LBAAS_TIMEOUT') 
+        @lbaas_timeout = meta['LBAAS_TIMEOUT']
+      end
+      if meta.has_key?('LBAAS_OPEN_TIMEOUT') 
+        @lbaas_open_timeout = meta['LBAAS_OPEN_TIMEOUT']
+      end
+      if meta.has_key?('LBAAS_KEYSTONE_HOST')
+        @lbaas_keystone_host = meta['LBAAS_KEYSTONE_HOST']
+      end
+      if meta.has_key?('LBAAS_KEYSTONE_USERNAME') 
+        @lbaas_keystone_username = meta['LBAAS_KEYSTONE_USERNAME']
+      end
+      if meta.has_key?('LBAAS_KEYSTONE_PASSWORD') 
+        @lbaas_keystone_password = meta['LBAAS_KEYSTONE_PASSWORD']
+      end
+      if meta.has_key?('LBAAS_KEYSTONE_TENANT') 
+        @lbaas_keystone_tenant = meta['LBAAS_KEYSTONE_TENANT']
+      end
+       
+      if meta.has_key?('VIRTUAL_SERVER')
+        @virtual_server_name = meta['VIRTUAL_SERVER']
+      end
+    end
+
     # Set the @blocked_on_cnt of the given Operation to the size of the given
     # Array of Operations, add the Operation to @blocked_ops of each of those
     # operations, and finally add the Operation to @ops.

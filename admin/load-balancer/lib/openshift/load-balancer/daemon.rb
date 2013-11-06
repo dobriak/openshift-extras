@@ -122,6 +122,10 @@ module OpenShift
 
     def handle event
       begin
+        if event[:meta]
+          @lb_controller.override_config event[:meta]
+        end
+        
         case event[:action]
         when :create_application
           create_application event[:app_name], event[:namespace]

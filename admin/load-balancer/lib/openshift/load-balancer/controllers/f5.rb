@@ -63,6 +63,14 @@ module OpenShift
       @virtual_server_name = cfg['VIRTUAL_SERVER']
     end
 
+    def override_config meta
+      @logger.info "F5 override_config called."
+      if meta.has_key?('VIRTUAL_SERVER')
+        @virtual_server_name = meta['VIRTUAL_SERVER']
+        @logger.info "virtual_server_name: #{@virtual_server_name}"
+      end
+    end
+
     def create_pool pool_name, monitor_name=nil
       raise LBControllerException.new "Pool already exists: #{pool_name}" if @pools.include? pool_name
 
