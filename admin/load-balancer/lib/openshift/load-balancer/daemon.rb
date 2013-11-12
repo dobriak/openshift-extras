@@ -122,21 +122,21 @@ module OpenShift
 
     def handle event
       begin
-        if event[:meta]
-          @lb_controller.override_config event[:meta]
-        else
-          @lb_controller.read_config
-        end
-        
+        #if event[:meta]
+        #  @lb_controller.override_config event[:meta]
+        #else
+        #  @lb_controller.read_config
+        #end
+        meta = event[:meta] || {} 
         case event[:action]
         when :create_application
-          create_application event[:app_name], event[:namespace]
+          create_application event[:app_name], event[:namespace], meta
         when :delete_application
-          delete_application event[:app_name], event[:namespace]
+          delete_application event[:app_name], event[:namespace], meta
         when :add_gear
-          add_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port]
+          add_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
         when :delete_gear
-          remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port]
+          remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
         end
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
@@ -174,7 +174,7 @@ module OpenShift
       @monitor_path_format.gsub /%./, '%a' => app_name, '%n' => namespace
     end
 
-    def create_application app_name, namespace
+    def create_application app_name, namespace, meta
       pool_name = generate_pool_name app_name, namespace
 
       raise StandardError.new "Creating application #{app_name} for which a pool already exists" if @lb_controller.pools.include? pool_name
@@ -191,7 +191,7 @@ module OpenShift
       end
 
       @logger.info "Creating new pool: #{pool_name}"
-      @lb_controller.create_pool pool_name, monitor_name
+      @lb_controller.create_pool pool_name, monitor_name, meta
 
       route_name = generate_route_name app_name, namespace
       route = '/' + app_name
@@ -199,7 +199,7 @@ module OpenShift
       @lb_controller.create_route pool_name, route_name, route
     end
 
-    def delete_application app_name, namespace
+    def delete_application app_name, namespace, meta
       pool_name = generate_pool_name app_name, namespace
 
       raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless @lb_controller.pools.include? pool_name
@@ -226,13 +226,13 @@ module OpenShift
       end
     end
 
-    def add_gear app_name, namespace, gear_host, gear_port
+    def add_gear app_name, namespace, gear_host, gear_port, meta
       pool_name = generate_pool_name app_name, namespace
       @logger.info "Adding new member #{gear_host}:#{gear_port} to pool #{pool_name}"
       @lb_controller.pools[pool_name].add_member gear_host, gear_port.to_i
     end
 
-    def remove_gear app_name, namespace, gear_host, gear_port
+    def remove_gear app_name, namespace, gear_host, gear_port, meta
       pool_name = generate_pool_name app_name, namespace
       @logger.info "Deleting member #{gear_host}:#{gear_port} from pool #{pool_name}"
       @lb_controller.pools[pool_name].delete_member gear_host, gear_port.to_i

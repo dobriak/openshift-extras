@@ -293,9 +293,10 @@ module OpenShift
         flatten 1
     end
 
-    def create_pool pool_name, monitor_name=nil
+    def create_pool pool_name, monitor_name=nil, meta={}
       raise LBControllerException.new "Pool already exists: #{pool_name}" if pools.include? pool_name
 
+      @logger.debug "lbaas controller create_pool meta: #{meta.inspect}"
       # :create_pool blocks
       # if the corresponding monitor is being created or
       # if the corresponding pool is being deleted

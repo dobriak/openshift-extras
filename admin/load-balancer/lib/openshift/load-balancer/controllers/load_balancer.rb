@@ -46,7 +46,7 @@ module OpenShift
     # @monitors, @routes, and @active_routes are arrays of strings.
     attr_reader :pools, :monitors, :routes, :active_routes
 
-    def create_pool pool_name, monitor_name=nil
+    def create_pool pool_name, monitor_name=nil, meta={}
     end
 
     def delete_pool pool_name

@@ -15,8 +15,11 @@ module OpenShift
       []
     end
 
-    def create_pool pool_name, monitor_name
+    def create_pool pool_name, monitor_name, params={} 
+      params.merge!(@default_params)
       @logger.debug "create pool #{pool_name} with monitor #{monitor_name}"
+      @logger.debug "dummy model create_pool params: #{params.inspect}"
+      
       [] # If using AsyncLoadBalancerController, return an array of jobids.
     end
 
@@ -103,7 +106,7 @@ module OpenShift
 
     def initialize host, user, passwd, logger
       @host, @user, @passwd, @logger = host, user, passwd, logger
-      @logger.debug "do initialization stuff"
+      @logger.debug "do initialization stuff #{@host} : #{@user},#{@passwd}"
     end
 
   end

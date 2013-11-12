@@ -64,8 +64,11 @@ module OpenShift
     end
 
     # Returns [String] of job ids.
-    def create_pool pool_name, monitor_name=nil
+    def create_pool pool_name, monitor_name=nil, params={}
       monitor_name ||= 'http'
+
+      params = @default_params.merge(params)
+      @logger.debug "lbaas model create_pool params: #{params.inspect}"
 
       response = put("http://#{@host}/loadbalancers/tenant/#{@tenant}/pools/#{pool_name}",
                      {
