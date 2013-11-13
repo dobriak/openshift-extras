@@ -75,7 +75,7 @@ module OpenShift
       
       @logger.debug "f5 controller create_pool meta: #{meta.inspect}"
 
-      @lb_model.create_pools [pool_name], [monitor_name]
+      @lb_model.create_pools [pool_name], [monitor_name], meta
 
       @pools[pool_name] = Pool.new self, @lb_model, pool_name
     end
