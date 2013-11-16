@@ -106,7 +106,7 @@ module OpenShift
 
     def initialize host, user, passwd, logger
       @host, @user, @passwd, @logger = host, user, passwd, logger
-      @default_params = { "host" => @host, "user" = > @user, "passwd" => @passwd }
+      @default_params = { "host" => @host, "user" => @user, "passwd" => @passwd }
       @logger.debug "do initialization stuff #{@host} : #{@user},#{@passwd}"
     end
 
