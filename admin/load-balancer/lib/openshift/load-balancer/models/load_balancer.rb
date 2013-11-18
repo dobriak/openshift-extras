@@ -24,13 +24,13 @@ module OpenShift
 
     # delete_pool :: String -> undefined
     # Note: At least one of delete_pool and delete_pools must be implemented.
-    def delete_pool pool_name
+    def delete_pool pool_name, params={}
     end
 
     # delete_pools :: [String] -> undefined
     # Note: At least one of delete_pool and delete_pools must be implemented.
-    def delete_pools pool_names
-      pool_names.map {|pool_name| delete_pool pool_name}.flatten 1
+    def delete_pools pool_names, params={}
+      pool_names.map {|pool_name| delete_pool pool_name, params}.flatten 1
     end
 
     def get_route_names

@@ -13,7 +13,9 @@ module OpenShift
       @bigip['LocalLB.Pool'].get_list.map {|pool| pool[8..-1]}
     end
 
-    def create_pools pool_names, monitor_names
+    def create_pools pool_names, monitor_names, params={}
+      params.merge!(@default_params)
+
       @bigip['LocalLB.Pool'].create pool_names.map {|pool| "/Common/#{pool}"}, ['LB_METHOD_ROUND_ROBIN'], []
       @bigip['LocalLB.Pool'].set_monitor_association pool_names.zip(monitor_names).map { |pool,monitor|
         if monitor
@@ -38,7 +40,8 @@ module OpenShift
       }
     end
 
-    def delete_pools pool_names
+    def delete_pools pool_names, params={}
+      params.merge!(@default_params)
       @bigip['LocalLB.Pool'].delete_pool pool_names.map {|pool| "/Common/#{pool}"}
     end
 
@@ -107,7 +110,8 @@ module OpenShift
     end
 
     def initialize host, user, passwd, logger
-      @host, @user, @passwd, @logger = host, user, passwd, logger
+      @host, @user, @passwd, @logger = host, user, passwd, loggera
+      @default_params = { "host" => host, "user" => user, "passwd" => passwd }
     end
 
   end

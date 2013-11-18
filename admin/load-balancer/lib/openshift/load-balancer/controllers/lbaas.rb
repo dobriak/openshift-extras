@@ -310,11 +310,12 @@ module OpenShift
       pools[pool_name] = Pool.new self, @lb_model, pool_name, false
     end
 
-    def delete_pool pool_name
+    def delete_pool pool_name, meta={}
       raise LBControllerException.new "Pool not found: #{pool_name}" unless pools.include? pool_name
 
       raise LBControllerException.new "Deleting pool that is already being deleted: #{pool_name}" if @ops.detect {|op| op.type == :delete_pool && op.operands == [pool_name]}
 
+      @logger.debug "lbaas controller delete_pool meta: #{meta.inspect}"
       # :delete_pool blocks
       # if the corresponding pool is being created,
       # if the corresponding route is being deleted,

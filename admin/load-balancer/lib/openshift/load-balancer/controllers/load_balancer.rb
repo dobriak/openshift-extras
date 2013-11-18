@@ -49,7 +49,7 @@ module OpenShift
     def create_pool pool_name, monitor_name=nil, meta={}
     end
 
-    def delete_pool pool_name
+    def delete_pool pool_name, meta={}
     end
 
     def create_route profile_name, profile_path, pool_name

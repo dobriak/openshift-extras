@@ -80,9 +80,10 @@ module OpenShift
       @pools[pool_name] = Pool.new self, @lb_model, pool_name
     end
 
-    def delete_pool pool_name
+    def delete_pool pool_name, meta
       raise LBControllerException.new "Pool not found: #{pool_name}" unless @pools.include? pool_name
 
+      @logger.debug "f5 controller delete_pool meta: #{meta.inspect}"
       update # in case we have pending delete operations for the pool.
 
       @lb_model.delete_pools [pool_name]

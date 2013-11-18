@@ -65,12 +65,11 @@ module OpenShift
 
     # Returns [String] of job ids.
     def create_pool pool_name, monitor_name=nil, params={}
+      params.merge!(@default_params)
+      @logger.debug "lbaas model create_pool params: #{params.inspect}"
       monitor_name ||= 'http'
 
-      params = @default_params.merge(params)
-      @logger.debug "lbaas model create_pool params: #{params.inspect}"
-
-      response = put("http://#{@host}/loadbalancers/tenant/#{@tenant}/pools/#{pool_name}",
+      response = put("http://#{params["host"]}/loadbalancers/tenant/#{params["tenant"]}/pools/#{pool_name}",
                      {
                        :pool => {
                          :name => pool_name,
@@ -86,8 +85,11 @@ module OpenShift
     end
 
     # Returns [String] of job ids.
-    def delete_pool pool_name
-      response = RestClient.delete("http://#{@host}/loadbalancers/tenant/#{@tenant}/pools/#{pool_name}",
+    def delete_pool pool_name, params={}
+      params.merge!(@default_params)
+      @logger.debug "lbaas model delete_pool params: #{params.inspect}"
+
+      response = RestClient.delete("http://#{params["host"]}/loadbalancers/tenant/#{params["tenant"]}/pools/#{pool_name}",
                                    :content_type => :json,
                                    :accept => :json,
                                    :'X-Auth-Token' => @keystone_token)
@@ -317,6 +319,7 @@ module OpenShift
 
     def initialize host, tenant, timeout, open_timeout, logger
       @host, @tenant, @timeout, @open_timeout, @logger = host, tenant, timeout, open_timeout, logger
+      @default_params = { "host" => host, "tenant" => tenant, "timeout" => timeout, "open_timeout" => open_timeout }
     end
 
   end
