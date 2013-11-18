@@ -207,7 +207,7 @@ module OpenShift
       begin
         route_name = generate_route_name app_name, namespace
         @logger.info "Deleting routing rule: #{route_name}"
-        @lb_controller.delete_route pool_name, route_name
+        @lb_controller.delete_route pool_name, route_name, meta
       ensure
         @logger.info "Deleting empty pool: #{pool_name}"
         @lb_controller.delete_pool pool_name
