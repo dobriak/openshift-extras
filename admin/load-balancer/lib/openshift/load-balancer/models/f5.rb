@@ -14,7 +14,7 @@ module OpenShift
     end
 
     def create_pools pool_names, monitor_names, params={}
-      params.merge!(@default_params)
+      @default_params.merge!(params)
 
       @bigip['LocalLB.Pool'].create pool_names.map {|pool| "/Common/#{pool}"}, ['LB_METHOD_ROUND_ROBIN'], []
       @bigip['LocalLB.Pool'].set_monitor_association pool_names.zip(monitor_names).map { |pool,monitor|
@@ -41,7 +41,7 @@ module OpenShift
     end
 
     def delete_pools pool_names, params={}
-      params.merge!(@default_params)
+      @default_params.merge!(params)
       @bigip['LocalLB.Pool'].delete_pool pool_names.map {|pool| "/Common/#{pool}"}
     end
 

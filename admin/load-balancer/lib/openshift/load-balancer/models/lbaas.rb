@@ -65,11 +65,11 @@ module OpenShift
 
     # Returns [String] of job ids.
     def create_pool pool_name, monitor_name=nil, params={}
-      params.merge!(@default_params)
+      @default_params.merge!(params)
       @logger.debug "lbaas model create_pool params: #{params.inspect}"
       monitor_name ||= 'http'
 
-      response = put("http://#{params["host"]}/loadbalancers/tenant/#{params["tenant"]}/pools/#{pool_name}",
+      response = put("http://#{@default_params["host"]}/loadbalancers/tenant/#{@default_params["tenant"]}/pools/#{pool_name}",
                      {
                        :pool => {
                          :name => pool_name,
@@ -86,10 +86,10 @@ module OpenShift
 
     # Returns [String] of job ids.
     def delete_pool pool_name, params={}
-      params.merge!(@default_params)
+      @default_params.merge!(params)
       @logger.debug "lbaas model delete_pool params: #{params.inspect}"
 
-      response = RestClient.delete("http://#{params["host"]}/loadbalancers/tenant/#{params["tenant"]}/pools/#{pool_name}",
+      response = RestClient.delete("http://#{@default_params["host"]}/loadbalancers/tenant/#{@default_params["tenant"]}/pools/#{pool_name}",
                                    :content_type => :json,
                                    :accept => :json,
                                    :'X-Auth-Token' => @keystone_token)
