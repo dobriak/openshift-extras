@@ -61,13 +61,16 @@ module OpenShift
       @bigip_password = cfg['BIGIP_PASSWORD'] || 'passwd'
 
       @virtual_server_name = cfg['VIRTUAL_SERVER']
+      @logger.info "F5 read_config result: #{@bigip_host},#{@bigip_host},#{@bigip_host},#{@virtual_server_name}"
     end
 
     def override_config meta
-      @logger.info "F5 override_config called."
-      if meta.has_key?('VIRTUAL_SERVER')
-        @virtual_server_name = meta['VIRTUAL_SERVER']
-      end
+      @logger.info "F5 override_config called. meta: #{meta.inspect}"
+      @big_ip_host = meta['bigip_host'] if meta.has_key?('bigip_host')
+      @bigip_username = meta['bigip_username'] if meta.has_key?('bigip_username')
+      @bigip_password = meta['bigip_password'] if meta.has_key?('bigip_password')
+      @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')
+      @logger.info "F5 override_config result: #{@bigip_host},#{@bigip_host},#{@bigip_host},#{@virtual_server_name}"
     end
 
     def create_pool pool_name, monitor_name=nil, meta
@@ -136,10 +139,13 @@ module OpenShift
       @pending_delete_member_ops = []
     end
 
-    def initialize lb_model_class, logger
-      read_config
-
+    def initialize lb_model_class, logger, meta={}
       @logger = logger
+
+      read_config
+      if meta.keys.count > 0
+        override_config meta
+      end
 
       @logger.info "Connecting to F5 BIG-IP at host #{@bigip_host}..."
       @lb_model = lb_model_class.new @bigip_host, @bigip_username, @bigip_password, @logger
