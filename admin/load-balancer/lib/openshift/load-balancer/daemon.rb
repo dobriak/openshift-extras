@@ -199,7 +199,7 @@ module OpenShift
     end
 
     def create_application app_name, namespace, meta
-      initialize_controllers if meta.keys.count > 0
+      initialize_controllersi(meta) if meta.keys.count > 0
       raise StandardError.new "lb_controllers empty" unless @lb_controllers
       @logger.info "daemon create_application lb_controllers: #{@lb_controllers.count} members"
       
@@ -231,7 +231,7 @@ module OpenShift
     end
 
     def delete_application app_name, namespace, meta
-      initialize_controllers if meta.keys.count > 0
+      initialize_controllers(meta) if meta.keys.count > 0
       raise StandardError.new "lb_controllers empty" unless @lb_controllers
 
       pool_name = generate_pool_name app_name, namespace
@@ -266,7 +266,7 @@ module OpenShift
     end
 
     def add_gear app_name, namespace, gear_host, gear_port, meta
-     initialize_controllers if meta.keys.count > 0
+     initialize_controllers(meta) if meta.keys.count > 0
      raise StandardError.new "lb_controllers empty" unless @lb_controllers
            
       pool_name = generate_pool_name app_name, namespace
@@ -277,7 +277,7 @@ module OpenShift
     end
 
     def remove_gear app_name, namespace, gear_host, gear_port, meta
-      initialize_controllers if meta.keys.count > 0
+      initialize_controllers(meta) if meta.keys.count > 0
       raise StandardError.new "lb_controllers empty" unless @lb_controllers
 
       pool_name = generate_pool_name app_name, namespace
