@@ -127,6 +127,7 @@ module OpenShift
         @lb_controllers << lb_controller
       end
       @logger.info "initialize_controllers initialized #{@lb_controllers.count} objects"
+      StandardError.new "Wrong format of user environment variables. It should be <variable name><number>=<value>, eg: host1=10.0.0.1" if @lb_controllers.count == 0
     end
 
     def listen
