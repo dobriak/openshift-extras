@@ -200,7 +200,7 @@ module OpenShift
     end
 
     def create_application app_name, namespace, meta
-      initialize_controllersi(meta) if meta.keys.count > 0
+      initialize_controllers(meta) if meta.keys.count > 0
       #raise StandardError.new "daemon create_application lb_controllers empty" unless @lb_controllers
       @logger.info "daemon create_application Creating #{@lb_controllers.count} applications"
       
