@@ -92,7 +92,7 @@ module OpenShift
 
       @logger.info "Initializing load-balancer controller..."
       lb_controller = @lb_controller_class.new @lb_model_class, @logger
-      @lb_controllers = [ lb_controller ]
+      @lb_controllers = [lb_controller]
       @logger.info "Found #{lb_controller.pools.length} pools:\n" +
                    lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
 
@@ -201,8 +201,8 @@ module OpenShift
 
     def create_application app_name, namespace, meta
       initialize_controllersi(meta) if meta.keys.count > 0
-      raise StandardError.new "lb_controllers empty" unless @lb_controllers
-      @logger.info "daemon create_application lb_controllers: #{@lb_controllers.count} members"
+      #raise StandardError.new "daemon create_application lb_controllers empty" unless @lb_controllers
+      @logger.info "daemon create_application Creating #{@lb_controllers.count} applications"
       
       pool_name = generate_pool_name app_name, namespace
       monitor_name = generate_monitor_name app_name, namespace
@@ -224,7 +224,7 @@ module OpenShift
         end
 
         @logger.info "Creating new pool: #{pool_name}"
-        lb_controller.create_pool pool_name, monitor_name, meta
+        lb_controller.create_pool pool_name, monitor_name
 
         @logger.info "Creating new routing rule #{route_name} for route #{route} to pool #{pool_name}"
         lb_controller.create_route pool_name, route_name, route
@@ -233,7 +233,7 @@ module OpenShift
 
     def delete_application app_name, namespace, meta
       initialize_controllers(meta) if meta.keys.count > 0
-      raise StandardError.new "lb_controllers empty" unless @lb_controllers
+      #raise StandardError.new "daemon delete_application lb_controllers empty" unless @lb_controllers
 
       pool_name = generate_pool_name app_name, namespace
       route_name = generate_route_name app_name, namespace
@@ -249,7 +249,7 @@ module OpenShift
           lb_controller.delete_route pool_name, route_name
         ensure
           @logger.info "Deleting empty pool: #{pool_name}"
-          lb_controller.delete_pool pool_name, meta
+          lb_controller.delete_pool pool_name
 
           # Check that the monitor exists and is specific to the
           # application (as indicated by having the application's name and
@@ -268,7 +268,7 @@ module OpenShift
 
     def add_gear app_name, namespace, gear_host, gear_port, meta
      initialize_controllers(meta) if meta.keys.count > 0
-     raise StandardError.new "lb_controllers empty" unless @lb_controllers
+     #raise StandardError.new "lb_controllers empty" unless @lb_controllers
            
       pool_name = generate_pool_name app_name, namespace
       @lb_controllers.each do |lb_controller|
@@ -279,7 +279,7 @@ module OpenShift
 
     def remove_gear app_name, namespace, gear_host, gear_port, meta
       initialize_controllers(meta) if meta.keys.count > 0
-      raise StandardError.new "lb_controllers empty" unless @lb_controllers
+      #raise StandardError.new "lb_controllers empty" unless @lb_controllers
 
       pool_name = generate_pool_name app_name, namespace
       @lb_controllers.each do |lb_controller|

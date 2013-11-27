@@ -161,36 +161,18 @@ module OpenShift
 
     def override_config meta
       @logger.info "LBaaS override_config called. meta: #{meta.inspect}"
-      if meta.has_key?('lbaas_host')
-        @lbaas_host = meta['lbaas_host']
-      end 
-      if meta.has_key?('lbaas_tenant') 
-        @lbaas_tenant = meta['lbaas_tenant']
-      end
-      if meta.has_key?('lbaas_timeout') 
-        @lbaas_timeout = meta['lbaas_timeout']
-      end
-      if meta.has_key?('lbaas_open_timeout') 
-        @lbaas_open_timeout = meta['lbaas_open_timeout']
-      end
-      if meta.has_key?('lbaas_keystone_host')
-        @lbaas_keystone_host = meta['lbaas_keystone_host']
-      end
-      if meta.has_key?('lbaas_keystone_username') 
-        @lbaas_keystone_username = meta['lbaas_keystone_username']
-      end
-      if meta.has_key?('lbaas_keystone_password') 
-        @lbaas_keystone_password = meta['lbaas_keystone_password']
-      end
-      if meta.has_key?('lbaas_keystone_tenant') 
-        @lbaas_keystone_tenant = meta['lbaas_keystone_tenant']
-      end
-       
-      if meta.has_key?('virtual_server_name')
-        @virtual_server_name = meta['virtual_server_name']
-      end
-      
-      @logger.info "LBaaS override_config results: #{@lbaas_host},#{@lbaas_tenant},#{@lbaas_timeout},#{@lbaas_open_timeout},#{@lbaas_keystone_host},#{@lbaas_keystone_username},#{@lbaas_keystone_password},#{@lbaas_keystone_tenant},#{@virtual_server_name}"
+
+      @lbaas_host = meta['lbaas_host'] if meta.has_key?('lbaas_host')
+      @lbaas_tenant = meta['lbaas_tenant'] if meta.has_key?('lbaas_tenant')
+      @lbaas_timeout = meta['lbaas_timeout'] if meta.has_key?('lbaas_timeout')  
+      @lbaas_open_timeout = meta['lbaas_open_timeout'] if meta.has_key?('lbaas_open_timeout')
+      @lbaas_keystone_host = meta['lbaas_keystone_host'] if meta.has_key?('lbaas_keystone_host')
+      @lbaas_keystone_username = meta['lbaas_keystone_username'] if meta.has_key?('lbaas_keystone_username')
+      @lbaas_keystone_password = meta['lbaas_keystone_password'] if meta.has_key?('lbaas_keystone_password')
+      @lbaas_keystone_tenant = meta['lbaas_keystone_tenant'] if meta.has_key?('lbaas_keystone_tenant')
+
+      @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')      
+      @logger.info "LBaaS override_config results: lbaas (host:#{@lbaas_host}, tenant:#{@lbaas_tenant}, timeout:#{@lbaas_timeout}, open timeout:#{@lbaas_open_timeout}, keystone (host:#{@lbaas_keystone_host}, username:#{@lbaas_keystone_username}, password:#{@lbaas_keystone_password}, tenant:#{@lbaas_keystone_tenant})), virtual server name:#{@virtual_server_name}"
     end
     # Set the @blocked_on_cnt of the given Operation to the size of the given
     # Array of Operations, add the Operation to @blocked_ops of each of those
@@ -294,10 +276,9 @@ module OpenShift
         flatten 1
     end
 
-    def create_pool pool_name, monitor_name=nil, meta={}
+    def create_pool pool_name, monitor_name=nil
       raise LBControllerException.new "Pool already exists: #{pool_name}" if pools.include? pool_name
 
-      @logger.debug "lbaas controller create_pool meta: #{meta.inspect}"
       # :create_pool blocks
       # if the corresponding monitor is being created or
       # if the corresponding pool is being deleted
@@ -311,7 +292,7 @@ module OpenShift
       pools[pool_name] = Pool.new self, @lb_model, pool_name, false
     end
 
-    def delete_pool pool_name, meta={}
+    def delete_pool pool_name
       raise LBControllerException.new "Pool not found: #{pool_name}" unless pools.include? pool_name
 
       raise LBControllerException.new "Deleting pool that is already being deleted: #{pool_name}" if @ops.detect {|op| op.type == :delete_pool && op.operands == [pool_name]}

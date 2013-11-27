@@ -61,32 +61,31 @@ module OpenShift
       @bigip_password = cfg['BIGIP_PASSWORD'] || 'passwd'
 
       @virtual_server_name = cfg['VIRTUAL_SERVER']
-      @logger.info "F5 read_config result: #{@bigip_host},#{@bigip_host},#{@bigip_host},#{@virtual_server_name}"
+      #@logger.info "F5 read_config result: bigip (host:#{@bigip_host},username:#{@bigip_username},password:#{@bigip_password}),#{@virtual_server_name}"
     end
 
     def override_config meta
-      @logger.info "F5 override_config called. meta: #{meta.inspect}"
+      @logger.info "F5 override_config called. meta keys:#{meta.keys.inspect}"
+      
       @big_ip_host = meta['bigip_host'] if meta.has_key?('bigip_host')
       @bigip_username = meta['bigip_username'] if meta.has_key?('bigip_username')
       @bigip_password = meta['bigip_password'] if meta.has_key?('bigip_password')
       @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')
-      @logger.info "F5 override_config result: #{@bigip_host},#{@bigip_host},#{@bigip_host},#{@virtual_server_name}"
+      
+      @logger.info "F5 override_config result: bigip (host:#{@bigip_host},username:#{@bigip_username},password:#{@bigip_password}),#{@virtual_server_name}"      
     end
 
-    def create_pool pool_name, monitor_name=nil, meta
+    def create_pool pool_name, monitor_name=nil
       raise LBControllerException.new "Pool already exists: #{pool_name}" if @pools.include? pool_name
       
-      @logger.debug "f5 controller create_pool meta: #{meta.inspect}"
-
-      @lb_model.create_pools [pool_name], [monitor_name], meta
+      @lb_model.create_pools [pool_name], [monitor_name]
 
       @pools[pool_name] = Pool.new self, @lb_model, pool_name
     end
 
-    def delete_pool pool_name, meta
+    def delete_pool pool_name
       raise LBControllerException.new "Pool not found: #{pool_name}" unless @pools.include? pool_name
 
-      @logger.debug "f5 controller delete_pool meta: #{meta.inspect}"
       update # in case we have pending delete operations for the pool.
 
       @lb_model.delete_pools [pool_name]
