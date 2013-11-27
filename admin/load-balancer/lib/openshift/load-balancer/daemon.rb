@@ -91,9 +91,10 @@ module OpenShift
                       end
 
       @logger.info "Initializing load-balancer controller..."
-      @lb_controllers = [ @lb_controller_class.new @lb_model_class, @logger ]
-      @logger.info "Found #{@lb_controller.pools.length} pools:\n" +
-                   @lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
+      lb_controller = @lb_controller_class.new @lb_model_class, @logger
+      @lb_controllers = [ lb_controller ]
+      @logger.info "Found #{lb_controller.pools.length} pools:\n" +
+                   lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
 
       @logger.info "Connecting to #{@host}:#{@port} as user #{@user}..."
       @aq = Stomp::Connection.open @user, @password, @host, @port, true
