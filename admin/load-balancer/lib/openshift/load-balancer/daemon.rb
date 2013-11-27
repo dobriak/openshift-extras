@@ -126,7 +126,7 @@ module OpenShift
                      lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
         @lb_controllers << lb_controller
       end
-      @logger.info "initialize_controllers initialized #{controllers.count} objects"
+      @logger.info "initialize_controllers initialized #{@lb_controllers.count} objects"
     end
 
     def listen
