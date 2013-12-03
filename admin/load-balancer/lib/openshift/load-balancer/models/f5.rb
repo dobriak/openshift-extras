@@ -107,7 +107,7 @@ module OpenShift
     end
 
     def initialize host, user, passwd, logger
-      @host, @user, @passwd, @logger = host, user, passwd, loggera
+      @host, @user, @passwd, @logger = host, user, passwd, logger
     end
 
   end

@@ -92,7 +92,11 @@ module OpenShift
 
       @logger.info "Initializing load-balancer controller..."
       lb_controller = @lb_controller_class.new @lb_model_class, @logger
-      @lb_controllers = [lb_controller]
+      controller_key = generate_controller_key(lb_controller.get_params['host'], 
+                          lb_controller.get_params['tenant'], 
+                          lb_controller.get_params['service_port'])
+      @lb_controllers = {controller_key => lb_controller}
+
       @logger.info "Found #{lb_controller.pools.length} pools:\n" +
                    lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
 
@@ -113,19 +117,25 @@ module OpenShift
       multi = Hash.new { |h,k| h[k] = Hash.new(&h.default_proc) }
       #select keys named varname<number>, eg hostname7
       meta.select{ |key,value| key.match(/\d+/)}.each do |key,value|
-        var_num = key.split(/(\d+)/)
+        varname,varnum = key.split(/(\d+)$/)
         #multi['7']['hostname'] = value
-        multi[var_num[1]][var_num[0]] = value
+        multi[varnum][varname] = value
       end
       #create controllers and add to array
-      @lb_controllers = []
+      #@lb_controllers = []
+      #init only if there is no controller with the given hostname
+
       multi.each do |multi_key,multi_value|
         @logger.info "Initializing load-balancer controller number #{multi_key}"
-        lb_controller = @lb_controller_class.new @lb_model_class, @logger, multi_value
-        @logger.info "Found #{lb_controller.pools.length} pools:\n" +
-                     lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
-        @lb_controllers << lb_controller
+        controller_key = generate_controller_key(multi_value['host'], multi_value['tenant'], multi_value['service_port'])
+        unless @lb_controllers.has_key?(controller_key)
+          lb_controller = @lb_controller_class.new @lb_model_class, @logger, multi_value
+          @logger.info "Found #{lb_controller.pools.length} pools:\n" +
+                       lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
+          @lb_controllers[controller_key] = lb_controller
+        end
       end
+
       @logger.info "initialize_controllers initialized #{@lb_controllers.count} objects"
       StandardError.new "Wrong format of user environment variables. It should be <variable name><number>=<value>, eg: host1=10.0.0.1" if @lb_controllers.count == 0
     end
@@ -149,7 +159,6 @@ module OpenShift
     def handle event
       begin
         meta = event[:meta] || {} 
-        #initialize_controllers if meta.keys.count > 0
         
         case event[:action]
         when :create_application
@@ -170,7 +179,7 @@ module OpenShift
     def update
       @last_update = Time.now
       begin
-        @lb_controllers.each do |lb_controller|
+        @lb_controllers.each do |key, lb_controller|
           lb_controller.update
         end
       rescue => e
@@ -199,9 +208,13 @@ module OpenShift
       @monitor_path_format.gsub /%./, '%a' => app_name, '%n' => namespace
     end
 
+    def generate_controller_key host, tenant, service_port
+      "#{host}:#{tenant}:#{service_port}"
+    end
+
+
     def create_application app_name, namespace, meta
-      initialize_controllers(meta) if meta.keys.count > 0
-      #raise StandardError.new "daemon create_application lb_controllers empty" unless @lb_controllers
+      initialize_controllers(meta) unless meta.empty?
       @logger.info "daemon create_application Creating #{@lb_controllers.count} applications"
       
       pool_name = generate_pool_name app_name, namespace
@@ -232,8 +245,7 @@ module OpenShift
     end
 
     def delete_application app_name, namespace, meta
-      initialize_controllers(meta) if meta.keys.count > 0
-      #raise StandardError.new "daemon delete_application lb_controllers empty" unless @lb_controllers
+      initialize_controllers(meta) unless meta.empty?
 
       pool_name = generate_pool_name app_name, namespace
       route_name = generate_route_name app_name, namespace
@@ -267,9 +279,8 @@ module OpenShift
     end
 
     def add_gear app_name, namespace, gear_host, gear_port, meta
-     initialize_controllers(meta) if meta.keys.count > 0
-     #raise StandardError.new "lb_controllers empty" unless @lb_controllers
-           
+      initialize_controllers(meta) unless meta.empty?
+                 
       pool_name = generate_pool_name app_name, namespace
       @lb_controllers.each do |lb_controller|
         @logger.info "Adding new member #{gear_host}:#{gear_port} to pool #{pool_name}"
@@ -278,8 +289,7 @@ module OpenShift
     end
 
     def remove_gear app_name, namespace, gear_host, gear_port, meta
-      initialize_controllers(meta) if meta.keys.count > 0
-      #raise StandardError.new "lb_controllers empty" unless @lb_controllers
+      initialize_controllers(meta) unless meta.empty?
 
       pool_name = generate_pool_name app_name, namespace
       @lb_controllers.each do |lb_controller|

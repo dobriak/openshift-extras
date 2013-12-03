@@ -60,20 +60,28 @@ module OpenShift
       @bigip_username = cfg['BIGIP_USERNAME'] || 'admin'
       @bigip_password = cfg['BIGIP_PASSWORD'] || 'passwd'
 
+      @service_port = cfg['SERVICE_PORT'] || 0
+
       @virtual_server_name = cfg['VIRTUAL_SERVER']
-      #@logger.info "F5 read_config result: bigip (host:#{@bigip_host},username:#{@bigip_username},password:#{@bigip_password}),#{@virtual_server_name}"
     end
 
     def override_config meta
       @logger.info "F5 override_config called. meta keys:#{meta.keys.inspect}"
       
-      @big_ip_host = meta['bigip_host'] if meta.has_key?('bigip_host')
-      @bigip_username = meta['bigip_username'] if meta.has_key?('bigip_username')
-      @bigip_password = meta['bigip_password'] if meta.has_key?('bigip_password')
+      @big_ip_host = meta['host'] if meta.has_key?('host')
+      @bigip_username = meta['username'] if meta.has_key?('username')
+      @bigip_password = meta['password'] if meta.has_key?('password')
       @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')
-      
+
+      @service_port = meta['service_port'] if (meta.has_key?['service_port'] && meta.has_key?['is_frontend'] && meta['is_frontend'] == '0')
+
       @logger.info "F5 override_config result: bigip (host:#{@bigip_host},username:#{@bigip_username},password:#{@bigip_password}),#{@virtual_server_name}"      
     end
+    
+    def get_params
+      { "host" => @bigip_host, "tenant" => "", "service_port" => @service_port }
+    end
+
 
     def create_pool pool_name, monitor_name=nil
       raise LBControllerException.new "Pool already exists: #{pool_name}" if @pools.include? pool_name
@@ -142,9 +150,7 @@ module OpenShift
       @logger = logger
 
       read_config
-      if meta.keys.count > 0
-        override_config meta
-      end
+      override_config(meta) unless meta.empty?
 
       @logger.info "Connecting to F5 BIG-IP at host #{@bigip_host}..."
       @lb_model = lb_model_class.new @bigip_host, @bigip_username, @bigip_password, @logger

@@ -156,24 +156,35 @@ module OpenShift
       @lbaas_keystone_password = cfg['LBAAS_KEYSTONE_PASSWORD'] || 'passwd'
       @lbaas_keystone_tenant = cfg['LBAAS_KEYSTONE_TENANT'] || 'lbms'
 
+      @service_port = cfg['SERVICE_PORT'] || 0
+      
       @virtual_server_name = cfg['VIRTUAL_SERVER']
     end
 
     def override_config meta
       @logger.info "LBaaS override_config called. meta: #{meta.inspect}"
 
-      @lbaas_host = meta['lbaas_host'] if meta.has_key?('lbaas_host')
-      @lbaas_tenant = meta['lbaas_tenant'] if meta.has_key?('lbaas_tenant')
-      @lbaas_timeout = meta['lbaas_timeout'] if meta.has_key?('lbaas_timeout')  
-      @lbaas_open_timeout = meta['lbaas_open_timeout'] if meta.has_key?('lbaas_open_timeout')
-      @lbaas_keystone_host = meta['lbaas_keystone_host'] if meta.has_key?('lbaas_keystone_host')
-      @lbaas_keystone_username = meta['lbaas_keystone_username'] if meta.has_key?('lbaas_keystone_username')
-      @lbaas_keystone_password = meta['lbaas_keystone_password'] if meta.has_key?('lbaas_keystone_password')
-      @lbaas_keystone_tenant = meta['lbaas_keystone_tenant'] if meta.has_key?('lbaas_keystone_tenant')
+      @lbaas_host = meta['host'] if meta.has_key?('host')
+      @lbaas_tenant = meta['tenant'] if meta.has_key?('tenant')
+      @lbaas_timeout = meta['timeout'] if meta.has_key?('timeout')  
+      @lbaas_open_timeout = meta['open_timeout'] if meta.has_key?('open_timeout')
+      @lbaas_keystone_host = meta['keystone_host'] if meta.has_key?('keystone_host')
+      @lbaas_keystone_username = meta['keystone_username'] if meta.has_key?('keystone_username')
+      @lbaas_keystone_password = meta['keystone_password'] if meta.has_key?('keystone_password')
+      @lbaas_keystone_tenant = meta['keystone_tenant'] if meta.has_key?('keystone_tenant')
+
+      @service_port = meta['service_port'] if (meta.has_key?['service_port'] && meta.has_key?['is_frontend'] && meta['is_frontend'] == '0')
 
       @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')      
       @logger.info "LBaaS override_config results: lbaas (host:#{@lbaas_host}, tenant:#{@lbaas_tenant}, timeout:#{@lbaas_timeout}, open timeout:#{@lbaas_open_timeout}, keystone (host:#{@lbaas_keystone_host}, username:#{@lbaas_keystone_username}, password:#{@lbaas_keystone_password}, tenant:#{@lbaas_keystone_tenant})), virtual server name:#{@virtual_server_name}"
     end
+  
+    def get_params
+      { "host" => @lbaas_host, "tenant" => @lbaas_tenant, "service_port" => @service_port }
+    end
+
+
+
     # Set the @blocked_on_cnt of the given Operation to the size of the given
     # Array of Operations, add the Operation to @blocked_ops of each of those
     # operations, and finally add the Operation to @ops.
@@ -510,9 +521,7 @@ module OpenShift
       @logger = logger
       
       read_config
-      if meta.keys.count > 0
-        override_config meta
-      end
+      override_config(meta) unless meta.empty?
       
       @lb_model = lb_model_class.new @lbaas_host, @lbaas_tenant, @lbaas_timeout.to_i, @lbaas_open_timeout.to_i, @logger
 
