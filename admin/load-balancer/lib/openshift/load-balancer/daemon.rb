@@ -140,7 +140,7 @@ module OpenShift
         end
       end
 
-      @logger.info "initialize_controllers processed #{controller_keys.count} objects"
+      @logger.info "initialize_controllers: processed #{@controller_keys.count} controller objects"
     end
 
     def listen
@@ -173,6 +173,7 @@ module OpenShift
         when :delete_gear
           remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
         end
+        @logger.info "handle event: lb_controllers: #{@lb_controllers.keys.inspect}, controller_keys: #{@controller_keys.inspect}"
         reset_controller_keys
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
@@ -256,7 +257,7 @@ module OpenShift
       route_name = generate_route_name app_name, namespace
       monitor_name = generate_monitor_name app_name, namespace
 
-      controller_keys.each do |key|
+      @controller_keys.each do |key|
         raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless @lb_controllers[key].pools.include? pool_name
 
         begin

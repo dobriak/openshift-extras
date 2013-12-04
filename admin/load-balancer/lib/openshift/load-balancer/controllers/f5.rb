@@ -73,7 +73,7 @@ module OpenShift
       @bigip_password = meta['password'] if meta.has_key?('password')
       @virtual_server_name = meta['virtual_server_name'] if meta.has_key?('virtual_server_name')
 
-      @service_port = meta['service_port'] if (meta.has_key?['service_port'] && meta.has_key?['is_frontend'] && meta['is_frontend'] == '0')
+      @service_port = meta['service_port'] if (meta.has_key?('service_port') && meta.has_key?('is_frontend') && meta['is_frontend'] == '0')
 
       @logger.info "F5 override_config result: bigip (host:#{@bigip_host},username:#{@bigip_username},password:#{@bigip_password}),#{@virtual_server_name}"      
     end
