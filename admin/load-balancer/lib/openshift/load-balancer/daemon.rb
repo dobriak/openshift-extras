@@ -96,8 +96,7 @@ module OpenShift
                           lb_controller.get_params['tenant'], 
                           lb_controller.get_params['service_port'])
       @lb_controllers = {controller_key => lb_controller}
-      @controller_keys = [controller_key]
-      @default_keys = [controller_key]
+      @controller_keys = @default_keys = [controller_key]
       
       @logger.info "Found #{lb_controller.pools.length} pools:\n" +
                    lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
@@ -113,7 +112,7 @@ module OpenShift
 
     #Initializes an array of lb_controller objects with values overriden by the contents of meta
     def initialize_controllers meta
-      @logger.info "initialize_controllers called with meta: #{meta.inspect}"
+      #@logger.info "initialize_controllers called with meta: #{meta.inspect}"
           
       #split meta into hash of hashes
       multi = Hash.new { |h,k| h[k] = Hash.new(&h.default_proc) }
