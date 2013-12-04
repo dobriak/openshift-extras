@@ -96,7 +96,9 @@ module OpenShift
                           lb_controller.get_params['tenant'], 
                           lb_controller.get_params['service_port'])
       @lb_controllers = {controller_key => lb_controller}
-
+      @controller_keys = [controller_key]
+      @default_keys = [controller_key]
+      
       @logger.info "Found #{lb_controller.pools.length} pools:\n" +
                    lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
 
@@ -112,7 +114,7 @@ module OpenShift
     #Initializes an array of lb_controller objects with values overriden by the contents of meta
     def initialize_controllers meta
       @logger.info "initialize_controllers called with meta: #{meta.inspect}"
-      
+          
       #split meta into hash of hashes
       multi = Hash.new { |h,k| h[k] = Hash.new(&h.default_proc) }
       #select keys named varname<number>, eg hostname7
@@ -121,13 +123,15 @@ module OpenShift
         #multi['7']['hostname'] = value
         multi[varnum][varname] = value
       end
-      #create controllers and add to array
-      #@lb_controllers = []
-      #init only if there is no controller with the given hostname
+      StandardError.new "Configuration variables not found, or using the wrong naming convention." if multi.empty?
 
+      #init only if there is no controller with the given controller key
+      @controller_keys = [] #array of the currently processed keys
       multi.each do |multi_key,multi_value|
-        @logger.info "Initializing load-balancer controller number #{multi_key}"
+        
         controller_key = generate_controller_key(multi_value['host'], multi_value['tenant'], multi_value['service_port'])
+        @controller_keys << controller_key
+
         unless @lb_controllers.has_key?(controller_key)
           lb_controller = @lb_controller_class.new @lb_model_class, @logger, multi_value
           @logger.info "Found #{lb_controller.pools.length} pools:\n" +
@@ -136,8 +140,7 @@ module OpenShift
         end
       end
 
-      @logger.info "initialize_controllers initialized #{@lb_controllers.count} objects"
-      StandardError.new "Wrong format of user environment variables. It should be <variable name><number>=<value>, eg: host1=10.0.0.1" if @lb_controllers.count == 0
+      @logger.info "initialize_controllers processed #{controller_keys.count} objects"
     end
 
     def listen
@@ -170,6 +173,7 @@ module OpenShift
         when :delete_gear
           remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
         end
+        reset_controller_keys
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
         @logger.debug "Backtrace:\n#{e.backtrace.join "\n"}"
@@ -178,9 +182,9 @@ module OpenShift
 
     def update
       @last_update = Time.now
-      begin
-        @lb_controllers.each do |key, lb_controller|
-          lb_controller.update
+      begin      
+        @controller_keys.each do |key|
+          @lb_controllers[key].update
         end
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
@@ -212,10 +216,12 @@ module OpenShift
       "#{host}:#{tenant}:#{service_port}"
     end
 
+    def reset_controller_keys
+      @controller_keys = @default_keys
+    end
 
     def create_application app_name, namespace, meta
       initialize_controllers(meta) unless meta.empty?
-      @logger.info "daemon create_application Creating #{@lb_controllers.count} applications"
       
       pool_name = generate_pool_name app_name, namespace
       monitor_name = generate_monitor_name app_name, namespace
@@ -223,24 +229,23 @@ module OpenShift
       route_name = generate_route_name app_name, namespace
       route = '/' + app_name
 
-      @lb_controllers.each do |lb_controller|
+      @controller_keys.each do |key|        
+        raise StandardError.new "Creating application #{app_name} for which a pool already exists" if @lb_controllers[key].pools.include? pool_name
 
-        raise StandardError.new "Creating application #{app_name} for which a pool already exists" if lb_controller.pools.include? pool_name
-
-        if lb_controller.monitors.include? monitor_name
+        if @lb_controllers[key].monitors.include? monitor_name
           @logger.info "Using existing monitor: #{monitor_name}"
         else
           unless monitor_name.nil? or monitor_name.empty? or monitor_path.nil? or monitor_path.empty?
             @logger.info "Creating new monitor #{monitor_name} with path #{monitor_path}"
-            lb_controller.create_monitor monitor_name, monitor_path, @monitor_up_code, @monitor_type, @monitor_interval, @monitor_timeout
+            @lb_controllers[key].create_monitor monitor_name, monitor_path, @monitor_up_code, @monitor_type, @monitor_interval, @monitor_timeout
           end
         end
 
         @logger.info "Creating new pool: #{pool_name}"
-        lb_controller.create_pool pool_name, monitor_name
+        @lb_controllers[key].create_pool pool_name, monitor_name
 
         @logger.info "Creating new routing rule #{route_name} for route #{route} to pool #{pool_name}"
-        lb_controller.create_route pool_name, route_name, route
+        @lb_controllers[key].create_route pool_name, route_name, route
       end 
     end
 
@@ -251,30 +256,27 @@ module OpenShift
       route_name = generate_route_name app_name, namespace
       monitor_name = generate_monitor_name app_name, namespace
 
-
-      @lb_controllers.each do |lb_controller|
-
-        raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless lb_controller.pools.include? pool_name
+      controller_keys.each do |key|
+        raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless @lb_controllers[key].pools.include? pool_name
 
         begin
           @logger.info "Deleting routing rule: #{route_name}"
-          lb_controller.delete_route pool_name, route_name
+          @lb_controllers[key].delete_route pool_name, route_name
         ensure
           @logger.info "Deleting empty pool: #{pool_name}"
-          lb_controller.delete_pool pool_name
+          @lb_controllers[key].delete_pool pool_name
 
           # Check that the monitor exists and is specific to the
           # application (as indicated by having the application's name and
           # namespace in the monitor's name).
-          if lb_controller.monitors.include?(monitor_name) && @monitor_name_format.match(/%a/) && @monitor_name_format.match(/%n/)
+          if @lb_controllers[key].monitors.include?(monitor_name) && @monitor_name_format.match(/%a/) && @monitor_name_format.match(/%n/)
             @logger.info "Deleting unused monitor: #{monitor_name}"
             # We pass pool_name to delete_monitor because some backends need the
             # name of the pool so that they will block the delete_monitor
             # operation until any corresponding delete_pool operation completes.
-            lb_controller.delete_monitor monitor_name, pool_name
+            @lb_controllers[key].delete_monitor monitor_name, pool_name
           end
         end
-
       end
     end
 
@@ -282,9 +284,9 @@ module OpenShift
       initialize_controllers(meta) unless meta.empty?
                  
       pool_name = generate_pool_name app_name, namespace
-      @lb_controllers.each do |lb_controller|
+      @controller_keys.each do |key|
         @logger.info "Adding new member #{gear_host}:#{gear_port} to pool #{pool_name}"
-        lb_controller.pools[pool_name].add_member gear_host, gear_port.to_i
+        @lb_controllers[key].pools[pool_name].add_member gear_host, gear_port.to_i
       end
     end
 
@@ -292,9 +294,9 @@ module OpenShift
       initialize_controllers(meta) unless meta.empty?
 
       pool_name = generate_pool_name app_name, namespace
-      @lb_controllers.each do |lb_controller|
+      @controller_keys.each do |key|
         @logger.info "Deleting member #{gear_host}:#{gear_port} from pool #{pool_name}"
-        lb_controller.pools[pool_name].delete_member gear_host, gear_port.to_i
+        @lb_controllers[key].pools[pool_name].delete_member gear_host, gear_port.to_i
       end
     end
 
