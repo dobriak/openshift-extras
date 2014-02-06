@@ -48,6 +48,12 @@ module OpenShift
 
         @lb_model_class = OpenShift::F5LoadBalancerModel
         @lb_controller_class = OpenShift::F5LoadBalancerController
+      when 'f5_multitenant'
+        require 'openshift/load-balancer/controllers/f5_multitenant'
+        require 'openshift/load-balancer/models/f5'
+
+        @lb_model_class = OpenShift::F5LoadBalancerModel
+        @lb_controller_class = OpenShift::F5LoadBalancerMultitenantController        
       when 'lbaas'
         require 'openshift/load-balancer/models/lbaas'
         require 'openshift/load-balancer/controllers/lbaas'
@@ -91,15 +97,9 @@ module OpenShift
                       end
 
       @logger.info "Initializing load-balancer controller..."
-      lb_controller = @lb_controller_class.new @lb_model_class, @logger
-      controller_key = generate_controller_key(lb_controller.get_params['host'], 
-                          lb_controller.get_params['tenant'], 
-                          lb_controller.get_params['service_port'])
-      @lb_controllers = {controller_key => lb_controller}
-      @controller_keys = @default_keys = [controller_key]
-      
-      @logger.info "Found #{lb_controller.pools.length} pools:\n" +
-                   lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
+      @lb_controller = @lb_controller_class.new @lb_model_class, @logger
+      @logger.info "Found #{@lb_controller.pools.length} pools:\n" +
+                   @lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
 
       @logger.info "Connecting to #{@host}:#{@port} as user #{@user}..."
       @aq = Stomp::Connection.open @user, @password, @host, @port, true
@@ -108,38 +108,6 @@ module OpenShift
       @aq.subscribe @destination, { :ack => 'client' }
 
       @last_update = Time.now
-    end
-
-    #Initializes an array of lb_controller objects with values overriden by the contents of meta
-    def initialize_controllers meta
-      #@logger.info "initialize_controllers called with meta: #{meta.inspect}"
-          
-      #split meta into hash of hashes
-      multi = Hash.new { |h,k| h[k] = Hash.new(&h.default_proc) }
-      #select keys named varname<number>, eg hostname7
-      meta.select{ |key,value| key.match(/\d+/)}.each do |key,value|
-        varname,varnum = key.split(/(\d+)$/)
-        #multi['7']['hostname'] = value
-        multi[varnum][varname] = value
-      end
-      StandardError.new "Configuration variables not found, or using the wrong naming convention." if multi.empty?
-
-      #init only if there is no controller with the given controller key
-      @controller_keys = [] #array of the currently processed keys
-      multi.each do |multi_key,multi_value|
-        
-        controller_key = generate_controller_key(multi_value['host'], multi_value['tenant'], multi_value['service_port'])
-        @controller_keys << controller_key
-
-        unless @lb_controllers.has_key?(controller_key)
-          lb_controller = @lb_controller_class.new @lb_model_class, @logger, multi_value
-          @logger.info "Found #{lb_controller.pools.length} pools:\n" +
-                       lb_controller.pools.map{|k,v|"  #{k} (#{v.members.length} members)"}.join("\n")
-          @lb_controllers[controller_key] = lb_controller
-        end
-      end
-
-      @logger.info "initialize_controllers: processed #{@controller_keys.count} controller objects"
     end
 
     def listen
@@ -160,20 +128,16 @@ module OpenShift
 
     def handle event
       begin
-        meta = event[:meta] || {} 
-        
         case event[:action]
         when :create_application
-          create_application event[:app_name], event[:namespace], meta
+          create_application event[:app_name], event[:namespace]
         when :delete_application
-          delete_application event[:app_name], event[:namespace], meta
+          delete_application event[:app_name], event[:namespace]
         when :add_gear
-          add_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
+          add_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port]
         when :delete_gear
-          remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port], meta
+          remove_gear event[:app_name], event[:namespace], event[:public_address], event[:public_port]
         end
-        @logger.info "handle event: lb_controllers: #{@lb_controllers.keys.inspect}, controller_keys: #{@controller_keys.inspect}"
-        reset_controller_keys
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
         @logger.debug "Backtrace:\n#{e.backtrace.join "\n"}"
@@ -182,10 +146,8 @@ module OpenShift
 
     def update
       @last_update = Time.now
-      begin      
-        @controller_keys.each do |key|
-          @lb_controllers[key].update
-        end
+      begin
+        @lb_controller.update
       rescue => e
         @logger.warn "Got an exception: #{e.message}"
         @logger.debug "Backtrace:\n#{e.backtrace.join "\n"}"
@@ -212,92 +174,68 @@ module OpenShift
       @monitor_path_format.gsub /%./, '%a' => app_name, '%n' => namespace
     end
 
-    def generate_controller_key host, tenant, service_port
-      "#{host}:#{tenant}:#{service_port}"
-    end
-
-    def reset_controller_keys
-      @controller_keys = @default_keys
-    end
-
-    def create_application app_name, namespace, meta
-      initialize_controllers(meta) unless meta.empty?
-      
+    def create_application app_name, namespace
       pool_name = generate_pool_name app_name, namespace
+
+      raise StandardError.new "Creating application #{app_name} for which a pool already exists" if @lb_controller.pools.include? pool_name
+
       monitor_name = generate_monitor_name app_name, namespace
-      monitor_path = generate_monitor_path app_name, namespace
+      if @lb_controller.monitors.include? monitor_name
+        @logger.info "Using existing monitor: #{monitor_name}"
+      else
+        monitor_path = generate_monitor_path app_name, namespace
+        unless monitor_name.nil? or monitor_name.empty? or monitor_path.nil? or monitor_path.empty?
+          @logger.info "Creating new monitor #{monitor_name} with path #{monitor_path}"
+          @lb_controller.create_monitor monitor_name, monitor_path, @monitor_up_code, @monitor_type, @monitor_interval, @monitor_timeout
+        end
+      end
+
+      @logger.info "Creating new pool: #{pool_name}"
+      @lb_controller.create_pool pool_name, monitor_name
+
       route_name = generate_route_name app_name, namespace
       route = '/' + app_name
-
-      @controller_keys.each do |key|        
-        raise StandardError.new "Creating application #{app_name} for which a pool already exists" if @lb_controllers[key].pools.include? pool_name
-
-        if @lb_controllers[key].monitors.include? monitor_name
-          @logger.info "Using existing monitor: #{monitor_name}"
-        else
-          unless monitor_name.nil? or monitor_name.empty? or monitor_path.nil? or monitor_path.empty?
-            @logger.info "Creating new monitor #{monitor_name} with path #{monitor_path}"
-            @lb_controllers[key].create_monitor monitor_name, monitor_path, @monitor_up_code, @monitor_type, @monitor_interval, @monitor_timeout
-          end
-        end
-
-        @logger.info "Creating new pool: #{pool_name}"
-        @lb_controllers[key].create_pool pool_name, monitor_name
-
-        @logger.info "Creating new routing rule #{route_name} for route #{route} to pool #{pool_name}"
-        @lb_controllers[key].create_route pool_name, route_name, route
-      end 
+      @logger.info "Creating new routing rule #{route_name} for route #{route} to pool #{pool_name}"
+      @lb_controller.create_route pool_name, route_name, route
     end
 
-    def delete_application app_name, namespace, meta
-      initialize_controllers(meta) unless meta.empty?
-
+    def delete_application app_name, namespace
       pool_name = generate_pool_name app_name, namespace
-      route_name = generate_route_name app_name, namespace
-      monitor_name = generate_monitor_name app_name, namespace
 
-      @controller_keys.each do |key|
-        raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless @lb_controllers[key].pools.include? pool_name
+      raise StandardError.new "Deleting application #{app_name} for which no pool exists" unless @lb_controller.pools.include? pool_name
 
-        begin
-          @logger.info "Deleting routing rule: #{route_name}"
-          @lb_controllers[key].delete_route pool_name, route_name
-        ensure
-          @logger.info "Deleting empty pool: #{pool_name}"
-          @lb_controllers[key].delete_pool pool_name
+      begin
+        route_name = generate_route_name app_name, namespace
+        @logger.info "Deleting routing rule: #{route_name}"
+        @lb_controller.delete_route pool_name, route_name
+      ensure
+        @logger.info "Deleting empty pool: #{pool_name}"
+        @lb_controller.delete_pool pool_name
 
-          # Check that the monitor exists and is specific to the
-          # application (as indicated by having the application's name and
-          # namespace in the monitor's name).
-          if @lb_controllers[key].monitors.include?(monitor_name) && @monitor_name_format.match(/%a/) && @monitor_name_format.match(/%n/)
-            @logger.info "Deleting unused monitor: #{monitor_name}"
-            # We pass pool_name to delete_monitor because some backends need the
-            # name of the pool so that they will block the delete_monitor
-            # operation until any corresponding delete_pool operation completes.
-            @lb_controllers[key].delete_monitor monitor_name, pool_name
-          end
+        monitor_name = generate_monitor_name app_name, namespace
+        # Check that the monitor exists and is specific to the
+        # application (as indicated by having the application's name and
+        # namespace in the monitor's name).
+        if @lb_controller.monitors.include?(monitor_name) && @monitor_name_format.match(/%a/) && @monitor_name_format.match(/%n/)
+          @logger.info "Deleting unused monitor: #{monitor_name}"
+          # We pass pool_name to delete_monitor because some backends need the
+          # name of the pool so that they will block the delete_monitor
+          # operation until any corresponding delete_pool operation completes.
+          @lb_controller.delete_monitor monitor_name, pool_name
         end
       end
     end
 
-    def add_gear app_name, namespace, gear_host, gear_port, meta
-      initialize_controllers(meta) unless meta.empty?
-                 
+    def add_gear app_name, namespace, gear_host, gear_port
       pool_name = generate_pool_name app_name, namespace
-      @controller_keys.each do |key|
-        @logger.info "Adding new member #{gear_host}:#{gear_port} to pool #{pool_name}"
-        @lb_controllers[key].pools[pool_name].add_member gear_host, gear_port.to_i
-      end
+      @logger.info "Adding new member #{gear_host}:#{gear_port} to pool #{pool_name}"
+      @lb_controller.pools[pool_name].add_member gear_host, gear_port.to_i
     end
 
-    def remove_gear app_name, namespace, gear_host, gear_port, meta
-      initialize_controllers(meta) unless meta.empty?
-
+    def remove_gear app_name, namespace, gear_host, gear_port
       pool_name = generate_pool_name app_name, namespace
-      @controller_keys.each do |key|
-        @logger.info "Deleting member #{gear_host}:#{gear_port} from pool #{pool_name}"
-        @lb_controllers[key].pools[pool_name].delete_member gear_host, gear_port.to_i
-      end
+      @logger.info "Deleting member #{gear_host}:#{gear_port} from pool #{pool_name}"
+      @lb_controller.pools[pool_name].delete_member gear_host, gear_port.to_i
     end
 
   end
